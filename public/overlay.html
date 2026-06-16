@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Overlay</title>
+  <style>
+    /* -----------------------------------------------------------------------
+       Base – transparent background so OBS sees through it
+    ----------------------------------------------------------------------- */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: transparent;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      color: #fff;
+      padding: 12px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    /* -----------------------------------------------------------------------
+       Cards
+    ----------------------------------------------------------------------- */
+    .card {
+      background: rgba(0, 0, 0, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+      padding: 12px 16px;
+      min-width: 220px;
+      max-width: 300px;
+    }
+
+    .card h2 {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #ffd700;
+      margin-bottom: 10px;
+      border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+      padding-bottom: 6px;
+    }
+
+    /* -----------------------------------------------------------------------
+       Scoreboard
+    ----------------------------------------------------------------------- */
+    #scoreboard-list {
+      list-style: none;
+    }
+
+    #scoreboard-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+      font-size: 0.9rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    #scoreboard-list li:last-child { border-bottom: none; }
+
+    #scoreboard-list li .rank {
+      font-size: 0.75rem;
+      color: #aaa;
+      width: 22px;
+    }
+
+    #scoreboard-list li .name { flex: 1; padding: 0 6px; }
+
+    #scoreboard-list li .pts {
+      font-weight: bold;
+      color: #ffd700;
+    }
+
+    /* -----------------------------------------------------------------------
+       Bets
+    ----------------------------------------------------------------------- */
+    #bets-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+
+    #bets-table th {
+      text-align: left;
+      color: #aaa;
+      font-weight: normal;
+      padding-bottom: 6px;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    #bets-table td {
+      padding: 3px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    #bets-table tr:last-child td { border-bottom: none; }
+
+    .color-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 5px;
+      vertical-align: middle;
+    }
+
+    .bet-amount { color: #ffd700; font-weight: bold; }
+
+    /* -----------------------------------------------------------------------
+       Empty state
+    ----------------------------------------------------------------------- */
+    .empty {
+      color: #666;
+      font-size: 0.82rem;
+      text-align: center;
+      padding: 8px 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Scoreboard card -->
+  <div class="card" id="scoreboard-card">
+    <h2 id="scoreboard-title">Leaderboard</h2>
+    <ul id="scoreboard-list">
+      <li><span class="empty">Waiting for points…</span></li>
+    </ul>
+  </div>
+
+  <!-- Bets card -->
+  <div class="card" id="bets-card">
+    <h2>Current Bets</h2>
+    <table id="bets-table">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Color</th>
+          <th>Amount</th>
+        </tr>
+      </thead>
+      <tbody id="bets-body">
+        <tr><td colspan="3" class="empty">No bets yet…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    // Resolve a CSS color from a color name string so the dot uses a real color.
+    // Falls back to a deterministic hue derived from the string.
+    function resolveColor(name) {
+      const known = {
+        red: '#e53935', blue: '#1e88e5', green: '#43a047',
+        yellow: '#fdd835', orange: '#fb8c00', purple: '#8e24aa',
+        pink: '#e91e63', white: '#f5f5f5', black: '#212121',
+        cyan: '#00acc1', teal: '#00897b', brown: '#6d4c41',
+      };
+      const lower = name.toLowerCase();
+      if (known[lower]) return known[lower];
+      // Derive a hue from the string for unknown colors
+      let hash = 0;
+      for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+      return `hsl(${Math.abs(hash) % 360}, 70%, 55%)`;
+    }
+
+    async function refreshScoreboard() {
+      try {
+        const res = await fetch('/api/scoreboard');
+        const data = await res.json();
+        const list = document.getElementById('scoreboard-list');
+
+        if (!data.length) {
+          list.innerHTML = '<li><span class="empty">Waiting for points…</span></li>';
+          return;
+        }
+
+        list.innerHTML = data.slice(0, 10).map((entry, i) => `
+          <li>
+            <span class="rank">${i + 1}.</span>
+            <span class="name">${escHtml(entry.player)}</span>
+            <span class="pts">${entry.points.toLocaleString()}</span>
+          </li>
+        `).join('');
+      } catch (_) { /* network hiccup – keep previous display */ }
+    }
+
+    async function refreshBets() {
+      try {
+        const res = await fetch('/api/bets');
+        const data = await res.json();
+        const tbody = document.getElementById('bets-body');
+
+        if (!data.length) {
+          tbody.innerHTML = '<tr><td colspan="3" class="empty">No bets yet…</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = data.slice(-20).reverse().map(b => `
+          <tr>
+            <td>${escHtml(b.user)}</td>
+            <td>
+              <span class="color-dot" style="background:${resolveColor(b.color)}"></span>
+              ${escHtml(b.color)}
+            </td>
+            <td class="bet-amount">${Number(b.amount).toLocaleString()}</td>
+          </tr>
+        `).join('');
+      } catch (_) { /* network hiccup – keep previous display */ }
+    }
+
+    async function loadConfig() {
+      try {
+        const res = await fetch('/api/config');
+        const cfg = await res.json();
+        if (cfg.overlayTitle) {
+          document.getElementById('scoreboard-title').textContent = cfg.overlayTitle;
+          document.title = cfg.overlayTitle;
+        }
+      } catch (_) {}
+    }
+
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // Initial load
+    loadConfig();
+    refreshScoreboard();
+    refreshBets();
+
+    // Refresh every 3 seconds
+    setInterval(refreshScoreboard, 3000);
+    setInterval(refreshBets, 3000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "channelId": "YOUR_CHANNEL_ID",
+  "apiKey": "YOUR_YOUTUBE_DATA_API_V3_KEY",
+  "port": 3000,
+  "pollIntervalMs": 5000,
+  "moderatorOnlyCommands": false,
+  "overlayTitle": "The Intellivision Gamer"
+}

@@ -1,0 +1,34 @@
+{
+  "name": "points-and-leaderboard",
+  "version": "1.0.0",
+  "description": "YouTube Live Chat Helper for The Intellivision Gamer channel — auto-updates scoreboard and betting table from chat commands.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "build": "pkg index.js --targets node18-win-x64 --output dist/points-and-leaderboard.exe"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.5.2",
+    "googleapis": "^140.0.0"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  },
+  "pkg": {
+    "assets": [
+      "public/**/*",
+      "config.json"
+    ]
+  },
+  "keywords": [
+    "youtube",
+    "live-chat",
+    "overlay",
+    "obs",
+    "leaderboard",
+    "points"
+  ],
+  "author": "The Intellivision Gamer",
+  "license": "MIT"
+}
