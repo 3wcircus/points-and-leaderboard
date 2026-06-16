@@ -2,6 +2,7 @@
 
 const express = require('express');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 const { google } = require('googleapis');
 
 // ---------------------------------------------------------------------------
@@ -203,9 +204,16 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Rate limiter applied to routes that perform file-system or heavy work
+const overlayLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 60,             // at most 60 requests per minute per IP (OBS refreshes once per second max)
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 /** Scoreboard JSON API */
-app.get('/api/scoreboard', (_req, res) => {
-  const sorted = Object.entries(scoreboard)
+app.get('/api/scoreboard', (_req, res) => {  const sorted = Object.entries(scoreboard)
     .sort((a, b) => b[1] - a[1])
     .map(([player, points]) => ({ player, points }));
   res.json(sorted);
@@ -222,7 +230,7 @@ app.get('/api/config', (_req, res) => {
 });
 
 /** OBS browser source overlay */
-app.get('/overlay', (_req, res) => {
+app.get('/overlay', overlayLimiter, (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'overlay.html'));
 });
 
